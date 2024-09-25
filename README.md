@@ -15,11 +15,19 @@ Original fluid shader from 2018
 Fluid dynamics based on David A Roberts' single-pass fluid solver  
 [https://www.shadertoy.com/view/XlsBDf](https://www.shadertoy.com/view/XlsBDf)
 
+Alien.js MVC design pattern  
+[https://github.com/alienkitty/alien.js](https://github.com/alienkitty/alien.js)
+
+Space.js UI  
+[https://github.com/alienkitty/space.js](https://github.com/alienkitty/space.js)
+
 #### Roadmap
 
 ~~Additional UI elements~~  
 ~~Implement binary websockets~~  
 ~~Implement pointer events~~  
 Support more connections  
+
+<br>
 
 [pschroen](https://ufo.ai/)
