@@ -4,73 +4,73 @@ import { Data } from '../data/Data.js';
 import { PreloaderView } from '../views/PreloaderView.js';
 
 export class Preloader {
-  static init() {
-    Data.init();
-    Data.Socket.init();
+	static init() {
+		Data.init();
+		Data.Socket.init();
 
-    this.initStage();
-    this.initView();
-    this.initLoader();
+		this.initStage();
+		this.initView();
+		this.initLoader();
 
-    this.addListeners();
-  }
+		this.addListeners();
+	}
 
-  static initStage() {
-    Stage.init();
-  }
+	static initStage() {
+		Stage.init();
+	}
 
-  static initView() {
-    this.view = new PreloaderView();
-    Stage.add(this.view);
-  }
+	static initView() {
+		this.view = new PreloaderView();
+		Stage.add(this.view);
+	}
 
-  static async initLoader() {
-    this.view.animateIn();
+	static async initLoader() {
+		this.view.animateIn();
 
-    const bufferLoader = new BufferLoader();
-    bufferLoader.loadAll([
-      'assets/sounds/bass_drum.mp3',
-      'assets/sounds/deep_spacy_loop.mp3',
-      'assets/sounds/water_loop.mp3'
-    ]);
+		const bufferLoader = new BufferLoader();
+		bufferLoader.loadAll([
+			'assets/sounds/bass_drum.mp3',
+			'assets/sounds/deep_spacy_loop.mp3',
+			'assets/sounds/water_loop.mp3'
+		]);
 
-    this.loader = new MultiLoader();
-    this.loader.load(bufferLoader);
-    this.loader.add(2);
+		this.loader = new MultiLoader();
+		this.loader.load(bufferLoader);
+		this.loader.add(2);
 
-    const { App } = await import('./App.js');
-    this.loader.trigger(1);
+		const { App } = await import('./App.js');
+		this.loader.trigger(1);
 
-    this.app = App;
+		this.app = App;
 
-    await this.app.init(bufferLoader);
-    this.loader.trigger(1);
-  }
+		await this.app.init(bufferLoader);
+		this.loader.trigger(1);
+	}
 
-  static addListeners() {
-    this.loader.events.on('progress', this.view.onProgress);
-    // this.view.events.on('complete', this.onComplete);
-    this.view.events.on('start', this.onStart);
-  }
+	static addListeners() {
+		this.loader.events.on('progress', this.view.onProgress);
+		// this.view.events.on('complete', this.onComplete);
+		this.view.events.on('start', this.onStart);
+	}
 
-  static removeListeners() {
-    this.loader.events.off('progress', this.view.onProgress);
-    // this.view.events.off('complete', this.onComplete);
-    this.view.events.off('start', this.onStart);
-  }
+	static removeListeners() {
+		this.loader.events.off('progress', this.view.onProgress);
+		// this.view.events.off('complete', this.onComplete);
+		this.view.events.off('start', this.onStart);
+	}
 
-  // Event handlers
+	// Event handlers
 
-  static onStart = async () => {
-    this.removeListeners();
+	static onStart = async () => {
+		this.removeListeners();
 
-    this.loader = this.loader.destroy();
+		this.loader = this.loader.destroy();
 
-    this.app.start();
+		this.app.start();
 
-    await this.view.animateOut();
-    this.view = this.view.destroy();
+		await this.view.animateOut();
+		this.view = this.view.destroy();
 
-    this.app.animateIn();
-  };
+		this.app.animateIn();
+	};
 }
