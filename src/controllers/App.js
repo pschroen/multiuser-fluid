@@ -3,6 +3,7 @@ import { Stage, UI, WebAudio, ticker, wait } from '@alienkitty/space.js/three';
 import { AudioController } from './audio/AudioController.js';
 import { WorldController } from './world/WorldController.js';
 import { FluidController } from './world/FluidController.js';
+import { PanelController } from './panel/PanelController.js';
 import { TrackersView } from '../views/TrackersView.js';
 import { HeaderNickname } from '../views/ui/HeaderNickname.js';
 
@@ -28,6 +29,7 @@ export class App {
 		]);
 
 		this.initAudio();
+		this.initPanel();
 	}
 
 	static initWorld() {
@@ -89,6 +91,10 @@ A fluid shader tribute to Mr.doob’s Multiuser Sketchpad from 2010. Multiuser F
 		WebAudio.load(this.loader.filter(path => /sounds/.test(path)));
 
 		AudioController.init(this.ui);
+	}
+
+	static initPanel() {
+		PanelController.init(this.ui);
 	}
 
 	static addListeners() {
