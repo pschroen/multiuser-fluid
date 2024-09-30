@@ -1,22 +1,29 @@
-import { Global } from '../config/Global.js';
 import { Socket } from './Socket.js';
+
+import { store } from '../config/Config.js';
 
 export class Data {
   static init() {
     this.Socket = new Socket();
   }
 
-  /**
-   * Public methods
-   */
+  // Public methods
 
   static getUser = id => {
-    for (let i = 0, l = Global.USERS.length; i < l; i++) {
-      if (Global.USERS[i].id === id) {
-        return Global.USERS[i];
-      }
+    return store.users.find(item => item.id === id);
+  };
+
+  static getReticleData = id => {
+    const data = this.getUser(id);
+
+    if (!data) {
+      return;
     }
 
-    return null;
+    return {
+      // primary: data.nickname || data.remoteAddress,
+      primary: data.nickname || data.id,
+      secondary: `${data.latency}ms`
+    };
   };
 }

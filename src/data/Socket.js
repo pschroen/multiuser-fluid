@@ -1,7 +1,6 @@
-import { Events } from '../config/Events.js';
-import { Global } from '../config/Global.js';
-import { EventEmitter } from '../utils/EventEmitter.js';
-import { Stage } from '../controllers/Stage.js';
+import { EventEmitter, Stage } from '@alienkitty/space.js/three';
+
+import { store } from '../config/Config.js';
 
 export class Socket extends EventEmitter {
   constructor() {
@@ -38,6 +37,13 @@ export class Socket extends EventEmitter {
     this.on('heartbeat', this.onHeartbeat);
   }
 
+  removeListeners() {
+    this.socket.removeEventListener('close', this.onClose);
+    this.socket.removeEventListener('message', this.onMessage);
+    this.off('users', this.onUsers);
+    this.off('heartbeat', this.onHeartbeat);
+  }
+
   ip2long(ip) {
     let ipl = 0;
 
@@ -53,9 +59,7 @@ export class Socket extends EventEmitter {
     return (ipl >>> 24) + '.' + (ipl >> 16 & 255) + '.' + (ipl >> 8 & 255) + '.' + (ipl & 255);
   }
 
-  /**
-   * Event handlers
-   */
+  // Event handlers
 
   onClose = () => {
     this.connected = false;
@@ -101,9 +105,9 @@ export class Socket extends EventEmitter {
   };
 
   onUsers = e => {
-    Global.USERS = e;
+    store.users = e;
 
-    Stage.events.emit(Events.UPDATE, e);
+    Stage.events.emit('update', e);
   };
 
   onHeartbeat = e => {
@@ -111,15 +115,13 @@ export class Socket extends EventEmitter {
       this.connected = true;
       this.id = e.getUint8(1).toString();
 
-      this.nickname(Global.NICKNAME);
+      this.nickname(store.nickname);
     }
 
     this.send(e);
   };
 
-  /**
-   * Public methods
-   */
+  // Public methods
 
   nickname = text => {
     const data = this.views[2];

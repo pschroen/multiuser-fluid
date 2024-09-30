@@ -1,20 +1,18 @@
-import { HalfFloatType, Vector2, WebGLRenderTarget } from 'three';
+import { HalfFloatType, Vector2 } from 'three';
+import { Reticle, Stage, getDoubleRenderTarget } from '@alienkitty/space.js/three';
 
-import { Events } from '../../config/Events.js';
-import { Global } from '../../config/Global.js';
 import { Data } from '../../data/Data.js';
 import { AudioController } from '../audio/AudioController.js';
-import { Stage } from '../Stage.js';
-import { Tracker } from '../../views/ui/Tracker.js';
 import { FluidPassMaterial } from '../../materials/FluidPassMaterial.js';
 import { FluidViewMaterial } from '../../materials/FluidViewMaterial.js';
 
+import { numPointers } from '../../config/Config.js';
+
 export class FluidController {
-  static init(renderer, scene, camera, screen, trackers) {
+  static init(renderer, screen, screenCamera, trackers) {
     this.renderer = renderer;
-    this.scene = scene;
-    this.camera = camera;
     this.screen = screen;
+    this.screenCamera = screenCamera;
     this.trackers = trackers;
 
     this.pointer = {};
@@ -29,12 +27,10 @@ export class FluidController {
 
   static initRenderer() {
     // Render targets
-    this.renderTargetRead = new WebGLRenderTarget(1, 1, {
+    this.fluid = getDoubleRenderTarget(1, 1, {
       type: HalfFloatType,
       depthBuffer: false
     });
-
-    this.renderTargetWrite = this.renderTargetRead.clone();
 
     // Fluid materials
     this.passMaterial = new FluidPassMaterial();
@@ -42,7 +38,7 @@ export class FluidController {
   }
 
   static initPointers() {
-    for (let i = 0; i < Global.NUM_POINTERS; i++) {
+    for (let i = 0; i < numPointers; i++) {
       this.passMaterial.uniforms.uMouse.value[i] = new Vector2(0.5, 0.5);
       this.passMaterial.uniforms.uLast.value[i] = new Vector2(0.5, 0.5);
       this.passMaterial.uniforms.uVelocity.value[i] = new Vector2();
@@ -58,16 +54,14 @@ export class FluidController {
   }
 
   static addListeners() {
-    Stage.events.on(Events.UPDATE, this.onUsers);
-    Stage.element.addEventListener('pointerdown', this.onPointerDown);
+    Stage.events.on('update', this.onUsers);
+    window.addEventListener('pointerdown', this.onPointerDown);
     window.addEventListener('pointermove', this.onPointerMove);
     window.addEventListener('pointerup', this.onPointerUp);
     Data.Socket.on('motion', this.onMotion);
   }
 
-  /**
-   * Event handlers
-   */
+  // Event handlers
 
   static onUsers = e => {
     const ids = e.map(user => user.id);
@@ -78,7 +72,7 @@ export class FluidController {
       }
 
       if (ids.includes(id)) {
-        this.pointer[id].tracker.setData(Data.getUser(id));
+        this.pointer[id].tracker.setData(Data.getReticleData(id));
       } else {
         this.pointer[id].tracker.animateOut(() => {
           if (this.pointer[id]) {
@@ -135,7 +129,7 @@ export class FluidController {
   };
 
   static onMotion = e => {
-    if (!this.pointer[e.id] && Object.keys(this.pointer).length - 1 < Global.NUM_POINTERS) {
+    if (!this.pointer[e.id] && Object.keys(this.pointer).length - 1 < numPointers) {
       this.pointer[e.id] = {};
       this.pointer[e.id].isDown = e.isDown;
       this.pointer[e.id].mouse = new Vector2();
@@ -145,25 +139,22 @@ export class FluidController {
       this.pointer[e.id].target.set(e.x * this.width, e.y * this.height);
       this.pointer[e.id].mouse.copy(this.pointer[e.id].target);
       this.pointer[e.id].last.copy(this.pointer[e.id].mouse);
-      this.pointer[e.id].tracker = this.trackers.add(new Tracker());
-      this.pointer[e.id].tracker.css({ left: Math.round(this.pointer[e.id].mouse.x), top: Math.round(this.pointer[e.id].mouse.y) });
-      this.pointer[e.id].tracker.setData(Data.getUser(e.id));
+      this.pointer[e.id].tracker = this.trackers.add(new Reticle());
+      this.pointer[e.id].tracker.css({ left: this.pointer[e.id].mouse.x, top: this.pointer[e.id].mouse.y });
+      this.pointer[e.id].tracker.setData(Data.getReticleData(e.id));
     }
 
     this.pointer[e.id].isDown = e.isDown;
     this.pointer[e.id].target.set(e.x * this.width, e.y * this.height);
   };
 
-  /**
-   * Public methods
-   */
+  // Public methods
 
   static resize = (width, height, dpr) => {
     this.width = width;
     this.height = height;
 
-    this.renderTargetRead.setSize(width * dpr, height * dpr);
-    this.renderTargetWrite.setSize(width * dpr, height * dpr);
+    this.fluid.setSize(width * dpr, height * dpr);
 
     this.pointer.main.mouse.set(width / 2, height / 2);
     this.pointer.main.last.copy(this.pointer.main.mouse);
@@ -177,10 +168,13 @@ export class FluidController {
     Object.keys(this.pointer).forEach((id, i) => {
       if (id !== 'main') {
         this.pointer[id].mouse.lerp(this.pointer[id].target, this.lerpSpeed);
-        this.pointer[id].tracker.css({ left: Math.round(this.pointer[id].mouse.x), top: Math.round(this.pointer[id].mouse.y) });
+
+        this.pointer[id].tracker.css({ left: this.pointer[id].mouse.x, top: this.pointer[id].mouse.y });
 
         if (!this.pointer[id].tracker.animatedIn) {
           this.pointer[id].tracker.animateIn();
+
+          AudioController.trigger('bass_drum');
         }
       }
 
@@ -197,20 +191,18 @@ export class FluidController {
       AudioController.update(id, this.pointer[id].mouse.x, this.pointer[id].mouse.y);
     });
 
-    this.passMaterial.uniforms.tMap.value = this.renderTargetRead.texture;
+    // Fluid pass
+    this.passMaterial.uniforms.tMap.value = this.fluid.read.texture;
     this.screen.material = this.passMaterial;
-    this.renderer.setRenderTarget(this.renderTargetWrite);
-    this.renderer.render(this.scene, this.camera);
+    this.renderer.setRenderTarget(this.fluid.write);
+    this.renderer.render(this.screen, this.screenCamera);
+    this.fluid.swap();
 
-    this.viewMaterial.uniforms.tMap.value = this.renderTargetWrite.texture;
+    // View pass (render to screen)
+    this.viewMaterial.uniforms.tMap.value = this.fluid.read.texture;
     this.screen.material = this.viewMaterial;
     this.renderer.setRenderTarget(null);
-    this.renderer.render(this.scene, this.camera);
-
-    // Swap render targets
-    const temp = this.renderTargetRead;
-    this.renderTargetRead = this.renderTargetWrite;
-    this.renderTargetWrite = temp;
+    this.renderer.render(this.screen, this.screenCamera);
   };
 
   static send = e => {
