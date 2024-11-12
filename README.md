@@ -4,6 +4,12 @@ A fluid shader tribute to Mr.doob's Multiuser Sketchpad from 2010. Multiuser Flu
 
 [https://multiuser-fluid.glitch.me/](https://multiuser-fluid.glitch.me/)
 
+## 2024 updates
+
+Fixes and updates, additional UI elements, support for more connections, and an observer mode.
+
+[https://multiuser-fluid.glitch.me/?observer](https://multiuser-fluid.glitch.me/?observer)
+
 #### Dev notes
 
 This is a remix of the rework  
@@ -26,7 +32,8 @@ Space.js UI
 ~~Additional UI elements~~  
 ~~Implement binary websockets~~  
 ~~Implement pointer events~~  
-Support more connections  
+~~Support more connections~~  
+~~Observer mode~~  
 
 <br>
 
