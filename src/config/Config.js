@@ -6,5 +6,7 @@ export const numPointers = 22; // iOS limit
 export const store = {
 	users: [],
 	sound: true,
-	nickname: ''
+	id: null,
+	nickname: '',
+	observer: false
 };

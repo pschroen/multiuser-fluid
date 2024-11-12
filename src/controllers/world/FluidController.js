@@ -6,14 +6,15 @@ import { AudioController } from '../audio/AudioController.js';
 import { FluidPassMaterial } from '../../materials/FluidPassMaterial.js';
 import { FluidViewMaterial } from '../../materials/FluidViewMaterial.js';
 
-import { numPointers } from '../../config/Config.js';
+import { numPointers, store } from '../../config/Config.js';
 
 export class FluidController {
-	static init(renderer, screen, screenCamera, trackers) {
+	static init(renderer, screen, screenCamera, trackers, ui) {
 		this.renderer = renderer;
 		this.screen = screen;
 		this.screenCamera = screenCamera;
 		this.trackers = trackers;
+		this.ui = ui;
 
 		this.pointer = {};
 		this.lerpSpeed = 0.07;
@@ -21,8 +22,6 @@ export class FluidController {
 
 		this.initRenderer();
 		this.initPointers();
-
-		this.addListeners();
 	}
 
 	static initRenderer() {
@@ -55,10 +54,16 @@ export class FluidController {
 
 	static addListeners() {
 		Stage.events.on('update', this.onUsers);
+		Data.Socket.on('motion', this.onMotion);
+
+		if (store.observer) {
+			this.ui.info.animateIn();
+			return;
+		}
+
 		window.addEventListener('pointerdown', this.onPointerDown);
 		window.addEventListener('pointermove', this.onPointerMove);
 		window.addEventListener('pointerup', this.onPointerUp);
-		Data.Socket.on('motion', this.onMotion);
 	}
 
 	// Event handlers
@@ -66,7 +71,7 @@ export class FluidController {
 	static onUsers = e => {
 		const ids = e.map(user => user.id);
 
-		Object.keys(this.pointer).forEach((id, i) => {
+		Object.keys(this.pointer).forEach(id => {
 			if (id === 'main') {
 				return;
 			}
@@ -81,10 +86,12 @@ export class FluidController {
 						delete this.pointer[id];
 					}
 
-					this.passMaterial.uniforms.uMouse.value[i] = new Vector2(0.5, 0.5);
-					this.passMaterial.uniforms.uLast.value[i] = new Vector2(0.5, 0.5);
-					this.passMaterial.uniforms.uVelocity.value[i] = new Vector2();
-					this.passMaterial.uniforms.uStrength.value[i] = new Vector2();
+					const i = Number(id);
+
+					this.passMaterial.uniforms.uMouse.value[i].set(0.5, 0.5);
+					this.passMaterial.uniforms.uLast.value[i].set(0.5, 0.5);
+					this.passMaterial.uniforms.uVelocity.value[i].set(0, 0);
+					this.passMaterial.uniforms.uStrength.value[i].set(0, 0);
 
 					AudioController.remove(id);
 				});
@@ -129,7 +136,7 @@ export class FluidController {
 	};
 
 	static onMotion = e => {
-		if (!this.pointer[e.id] && Object.keys(this.pointer).length - 1 < numPointers) {
+		if (!this.pointer[e.id]) {
 			this.pointer[e.id] = {};
 			this.pointer[e.id].isDown = e.isDown;
 			this.pointer[e.id].mouse = new Vector2();
@@ -165,7 +172,7 @@ export class FluidController {
 			return;
 		}
 
-		Object.keys(this.pointer).forEach((id, i) => {
+		Object.keys(this.pointer).forEach(id => {
 			if (id !== 'main') {
 				this.pointer[id].mouse.lerp(this.pointer[id].target, this.lerpSpeed);
 
@@ -178,17 +185,21 @@ export class FluidController {
 				}
 			}
 
-			this.pointer[id].delta.subVectors(this.pointer[id].mouse, this.pointer[id].last);
-			this.pointer[id].last.copy(this.pointer[id].mouse);
+			if (!(store.observer && id === 'main')) {
+				this.pointer[id].delta.subVectors(this.pointer[id].mouse, this.pointer[id].last);
+				this.pointer[id].last.copy(this.pointer[id].mouse);
 
-			const distance = Math.min(10, this.pointer[id].delta.length()) / 10;
+				const distance = Math.min(10, this.pointer[id].delta.length()) / 10;
 
-			this.passMaterial.uniforms.uLast.value[i].copy(this.passMaterial.uniforms.uMouse.value[i]);
-			this.passMaterial.uniforms.uMouse.value[i].set(this.pointer[id].mouse.x / this.width, (this.height - this.pointer[id].mouse.y) / this.height);
-			this.passMaterial.uniforms.uVelocity.value[i].copy(this.pointer[id].delta);
-			this.passMaterial.uniforms.uStrength.value[i].set((id === 'main' && !this.pointer[id].isMove) || this.pointer[id].isDown ? 50 : 50 * distance, 50 * distance);
+				const i = id === 'main' ? Number(store.id) : Number(id);
 
-			AudioController.update(id, this.pointer[id].mouse.x, this.pointer[id].mouse.y);
+				this.passMaterial.uniforms.uLast.value[i].copy(this.passMaterial.uniforms.uMouse.value[i]);
+				this.passMaterial.uniforms.uMouse.value[i].set(this.pointer[id].mouse.x / this.width, (this.height - this.pointer[id].mouse.y) / this.height);
+				this.passMaterial.uniforms.uVelocity.value[i].copy(this.pointer[id].delta);
+				this.passMaterial.uniforms.uStrength.value[i].set((id === 'main' && !this.pointer[id].isMove) || this.pointer[id].isDown ? 50 : 50 * distance, 50 * distance);
+
+				AudioController.update(id, this.pointer[id].mouse.x, this.pointer[id].mouse.y);
+			}
 		});
 
 		// Fluid pass
@@ -211,6 +222,10 @@ export class FluidController {
 			x: e.x / this.width,
 			y: e.y / this.height
 		});
+	};
+
+	static start = () => {
+		this.addListeners();
 	};
 
 	static animateIn = () => {

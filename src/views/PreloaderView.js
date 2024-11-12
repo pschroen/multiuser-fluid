@@ -22,18 +22,16 @@ export class PreloaderView extends Interface {
 			top: 0,
 			width: '100%',
 			height: '100%',
-			backgroundColor: 'var(--bg-color)',
 			zIndex: 100,
 			pointerEvents: 'none'
 		});
 
 		this.bg = new Interface('.bg');
-		this.bg.hide();
 		this.bg.css({
 			position: 'absolute',
 			width: '100%',
 			height: '100%',
-			pointerEvents: 'auto'
+			backgroundColor: 'var(--bg-color)'
 		});
 		this.add(this.bg);
 
@@ -183,7 +181,9 @@ export class PreloaderView extends Interface {
 				if (this.nickname.isComplete) {
 					this.events.emit('start');
 				} else {
-					this.bg.show();
+					this.bg.css({ pointerEvents: 'auto' });
+					this.bg.tween({ opacity: 0 }, 2000, 'easeOutSine');
+
 					this.addStartButton();
 				}
 			}

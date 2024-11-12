@@ -5,15 +5,27 @@
  */
 
 import express from 'express';
-const app = express();
-
 import enableWs from 'express-ws';
-const expressWs = enableWs(app);
-expressWs.getWss('/');
 
 const interval = 4000; // 4 second heartbeat
 
+const app = express();
+const expressWs = enableWs(app);
+expressWs.getWss('/');
+
 app.use(express.static('public'));
+
+//
+
+import { ObjectPool } from '@alienkitty/space.js/three';
+
+import { numPointers } from './src/config/Config.js';
+
+const mousePool = new ObjectPool();
+
+for (let i = 0; i < numPointers; i++) {
+	mousePool.put(i);
+}
 
 //
 
@@ -34,8 +46,8 @@ function getUsers() {
 	}
 
 	const length = clients.length;
-	const byteLength = 1 + 10 + 4 + 2;
-	const data = Buffer.allocUnsafe(1 + byteLength * length);
+	const byteLength = 1 + 10 + 4 + 2; // mouse + nickname + remoteAddress + latency
+	const data = Buffer.allocUnsafe(1 + byteLength * length); // event + size * users
 	data.writeUInt8(0, 0);
 
 	let index = 1;
@@ -43,7 +55,7 @@ function getUsers() {
 	for (let i = 0; i < length; i++) {
 		const client = clients[i];
 
-		data.writeUInt8(client._id, index);
+		data.writeUInt8(client._mouse === null ? numPointers : client._mouse, index);
 
 		const buf = Buffer.from(client._nickname, 'utf8');
 
@@ -79,11 +91,14 @@ function add(ws, request) {
 
 			ws._id = i;
 			ws._idle = Date.now();
+			ws._mouse = request.query.observer !== undefined ? null : mousePool.get();
 			ws._nickname = '';
 			ws._remoteAddress = remoteAddress;
 			ws._latency;
 
 			room[i] = ws;
+
+			console.log('REMOTE:', ws._remoteAddress, request.headers['user-agent']);
 
 			return;
 		}
@@ -101,6 +116,10 @@ function remove(ws) {
 
 	if (~index) {
 		room[index] = undefined;
+	}
+
+	if (ws._mouse !== null) {
+		mousePool.put(ws._mouse);
 	}
 }
 
@@ -133,18 +152,27 @@ app.ws('/', (ws, request) => {
 	ws.on('message', data => {
 		ws._idle = 0;
 
-		data.writeUInt8(ws._id, 1);
-
 		switch (data.readUInt8(0)) {
 			case 1:
+				// console.log('HEARTBEAT:', data);
 				ws._latency = Math.min(65535, Date.now() - Number(data.readBigUInt64BE(2))); // Clamp to 65535
 				break;
-			case 2:
-				ws._nickname = Buffer.from(data.subarray(2), 'utf-8').toString();
-				users(ws);
+			case 2: {
+				if (ws._mouse !== null) {
+					// console.log('NICKNAME:', data);
+					ws._nickname = Buffer.from(data.subarray(2), 'utf-8').toString();
+					users(ws);
+				}
 				break;
-			case 3:
-				broadcast(ws, data);
+			}
+			case 3: {
+				if (ws._mouse !== null) {
+					data.writeUInt8(ws._mouse, 1);
+
+					// console.log('MOTION:', data);
+					broadcast(ws, data);
+				}
+			}
 		}
 
 		// console.log('MESSAGE:', data);
@@ -154,7 +182,7 @@ app.ws('/', (ws, request) => {
 		if (ws.readyState === ws.OPEN) {
 			const data = Buffer.allocUnsafe(10);
 			data.writeUInt8(1, 0);
-			data.writeUInt8(ws._id, 1);
+			data.writeUInt8(ws._mouse === null ? numPointers : ws._mouse, 1);
 			data.writeBigUInt64BE(BigInt(Date.now()), 2);
 
 			ws.send(data);

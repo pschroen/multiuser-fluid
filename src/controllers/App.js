@@ -1,5 +1,6 @@
 import { Stage, UI, WebAudio, ticker, wait } from '@alienkitty/space.js/three';
 
+import { Data } from '../data/Data.js';
 import { AudioController } from './audio/AudioController.js';
 import { WorldController } from './world/WorldController.js';
 import { FluidController } from './world/FluidController.js';
@@ -25,11 +26,14 @@ export class App {
 
 		await Promise.all([
 			document.fonts.ready,
+			Data.Socket.ready(),
 			this.loader.ready()
 		]);
 
 		this.initAudio();
 		this.initPanel();
+
+		FluidController.start();
 	}
 
 	static initWorld() {
@@ -44,6 +48,9 @@ export class App {
 		this.ui = new UI({
 			fps: true,
 			breakpoint,
+			info: {
+				content: 'Observer'
+			},
 			details: {
 				background: true,
 				title: 'Multiuser Fluid'.replace(/[\s.]+/g, '_'),
@@ -83,7 +90,7 @@ A fluid shader tribute to Mr.doob’s Multiuser Sketchpad from 2010. Multiuser F
 	static initControllers() {
 		const { renderer, screen, screenCamera } = WorldController;
 
-		FluidController.init(renderer, screen, screenCamera, this.trackers);
+		FluidController.init(renderer, screen, screenCamera, this.trackers, this.ui);
 	}
 
 	static initAudio() {
