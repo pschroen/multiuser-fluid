@@ -10,6 +10,11 @@ Fixes and updates, additional UI elements, support for more connections, and an 
 
 [https://multiuser-fluid.glitch.me/?observer](https://multiuser-fluid.glitch.me/?observer)
 
+## Keyboard shortcuts
+
+**Esc**: Toggle details.  
+**Control-0**: Toggle UI.  
+
 #### Dev notes
 
 This is a remix of the rework  
