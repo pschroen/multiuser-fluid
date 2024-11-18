@@ -5,6 +5,7 @@ import { Data } from '../../data/Data.js';
 import { AudioController } from '../audio/AudioController.js';
 import { FluidPassMaterial } from '../../materials/FluidPassMaterial.js';
 import { FluidViewMaterial } from '../../materials/FluidViewMaterial.js';
+import { DetailsUser } from '../../views/ui/DetailsUser.js';
 
 import { numPointers, store } from '../../config/Config.js';
 
@@ -50,6 +51,8 @@ export class FluidController {
 		this.pointer.main.mouse = new Vector2();
 		this.pointer.main.last = new Vector2();
 		this.pointer.main.delta = new Vector2();
+
+		this.pointer.main.info = this.ui.detailsUsers.add(new DetailsUser());
 	}
 
 	static addListeners() {
@@ -71,21 +74,23 @@ export class FluidController {
 	static onUsers = e => {
 		const ids = e.map(user => user.id);
 
+		// Update and prune
 		Object.keys(this.pointer).forEach(id => {
 			if (id === 'main') {
+				this.pointer.main.info.setData(Data.getUserData(store.id));
 				return;
 			}
 
 			if (ids.includes(id)) {
 				this.pointer[id].tracker.setData(Data.getReticleData(id));
+				this.pointer[id].info.setData(Data.getUserData(id));
 			} else {
-				this.pointer[id].tracker.animateOut(() => {
-					if (this.pointer[id]) {
-						this.pointer[id].tracker.destroy();
+				const tracker = this.pointer[id].tracker;
+				const info = this.pointer[id].info;
 
-						delete this.pointer[id];
-					}
+				delete this.pointer[id];
 
+				tracker.animateOut(() => {
 					const i = Number(id);
 
 					this.passMaterial.uniforms.uMouse.value[i].set(0.5, 0.5);
@@ -94,6 +99,12 @@ export class FluidController {
 					this.passMaterial.uniforms.uStrength.value[i].set(0, 0);
 
 					AudioController.remove(id);
+
+					tracker.destroy();
+
+					info.animateOut(() => {
+						info.destroy();
+					});
 				});
 			}
 		});
@@ -122,6 +133,12 @@ export class FluidController {
 		this.pointer.main.isMove = true;
 		this.pointer.main.mouse.copy(event);
 
+		this.pointer.main.info.setData(Data.getUserData(store.id), {
+			isDown: this.pointer.main.isDown,
+			x: event.x / this.width,
+			y: event.y / this.height
+		});
+
 		this.send(event);
 	};
 
@@ -136,6 +153,7 @@ export class FluidController {
 	};
 
 	static onMotion = e => {
+		// New
 		if (!this.pointer[e.id]) {
 			this.pointer[e.id] = {};
 			this.pointer[e.id].isDown = e.isDown;
@@ -146,13 +164,31 @@ export class FluidController {
 			this.pointer[e.id].target.set(e.x * this.width, e.y * this.height);
 			this.pointer[e.id].mouse.copy(this.pointer[e.id].target);
 			this.pointer[e.id].last.copy(this.pointer[e.id].mouse);
+
 			this.pointer[e.id].tracker = this.trackers.add(new Reticle());
 			this.pointer[e.id].tracker.css({ left: this.pointer[e.id].mouse.x, top: this.pointer[e.id].mouse.y });
 			this.pointer[e.id].tracker.setData(Data.getReticleData(e.id));
+			this.pointer[e.id].tracker.animateIn();
+
+			this.pointer[e.id].info = this.ui.detailsUsers.add(new DetailsUser());
+
+			if (this.ui.isDetailsOpen) {
+				this.pointer[e.id].info.enable();
+				this.pointer[e.id].info.animateIn();
+			}
+
+			AudioController.trigger('bass_drum');
 		}
 
+		// Update
 		this.pointer[e.id].isDown = e.isDown;
 		this.pointer[e.id].target.set(e.x * this.width, e.y * this.height);
+
+		this.pointer[e.id].info.setData(Data.getUserData(e.id), {
+			isDown: e.isDown,
+			x: e.x,
+			y: e.y
+		});
 	};
 
 	// Public methods
@@ -175,14 +211,7 @@ export class FluidController {
 		Object.keys(this.pointer).forEach(id => {
 			if (id !== 'main') {
 				this.pointer[id].mouse.lerp(this.pointer[id].target, this.lerpSpeed);
-
 				this.pointer[id].tracker.css({ left: this.pointer[id].mouse.x, top: this.pointer[id].mouse.y });
-
-				if (!this.pointer[id].tracker.animatedIn) {
-					this.pointer[id].tracker.animateIn();
-
-					AudioController.trigger('bass_drum');
-				}
 			}
 
 			if (!(store.observer && id === 'main')) {
