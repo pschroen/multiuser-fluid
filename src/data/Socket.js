@@ -126,7 +126,7 @@ export class Socket extends EventEmitter {
 	onHeartbeat = ({ id/* , time */ }) => {
 		if (!this.connected) {
 			this.connected = true;
-			this.id = id;
+			// this.id = id;
 
 			store.id = id;
 
