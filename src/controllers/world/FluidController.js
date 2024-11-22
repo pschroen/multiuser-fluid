@@ -72,7 +72,36 @@ export class FluidController {
 	// Event handlers
 
 	static onUsers = e => {
+		if (!store.id) {
+			return;
+		}
+
 		const ids = e.map(user => user.id);
+
+		// New
+		ids.forEach(id => {
+			if (id === store.id) {
+				return;
+			}
+
+			if (Number(id) !== numPointers && !this.pointer[id]) {
+				this.pointer[id] = {};
+				this.pointer[id].isMove = false;
+				this.pointer[id].isDown = false;
+				this.pointer[id].mouse = new Vector2();
+				this.pointer[id].last = new Vector2();
+				this.pointer[id].delta = new Vector2();
+				this.pointer[id].target = new Vector2();
+
+				this.pointer[id].tracker = this.trackers.add(new Reticle());
+				this.pointer[id].info = this.ui.detailsUsers.add(new DetailsUser());
+
+				if (this.ui.isDetailsOpen) {
+					this.pointer[id].info.enable();
+					this.pointer[id].info.animateIn();
+				}
+			}
+		});
 
 		// Update and prune
 		Object.keys(this.pointer).forEach(id => {
@@ -153,29 +182,21 @@ export class FluidController {
 	};
 
 	static onMotion = e => {
-		// New
 		if (!this.pointer[e.id]) {
-			this.pointer[e.id] = {};
+			return;
+		}
+
+		// First input
+		if (!this.pointer[e.id].isMove) {
+			this.pointer[e.id].isMove = true;
 			this.pointer[e.id].isDown = e.isDown;
-			this.pointer[e.id].mouse = new Vector2();
-			this.pointer[e.id].last = new Vector2();
-			this.pointer[e.id].delta = new Vector2();
-			this.pointer[e.id].target = new Vector2();
 			this.pointer[e.id].target.set(e.x * this.width, e.y * this.height);
 			this.pointer[e.id].mouse.copy(this.pointer[e.id].target);
 			this.pointer[e.id].last.copy(this.pointer[e.id].mouse);
 
-			this.pointer[e.id].tracker = this.trackers.add(new Reticle());
 			this.pointer[e.id].tracker.css({ left: this.pointer[e.id].mouse.x, top: this.pointer[e.id].mouse.y });
 			this.pointer[e.id].tracker.setData(Data.getReticleData(e.id));
 			this.pointer[e.id].tracker.animateIn();
-
-			this.pointer[e.id].info = this.ui.detailsUsers.add(new DetailsUser());
-
-			if (this.ui.isDetailsOpen) {
-				this.pointer[e.id].info.enable();
-				this.pointer[e.id].info.animateIn();
-			}
 
 			AudioController.trigger('bass_drum');
 		}
