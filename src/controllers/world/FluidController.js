@@ -52,7 +52,9 @@ export class FluidController {
 		this.pointer.main.last = new Vector2();
 		this.pointer.main.delta = new Vector2();
 
-		this.pointer.main.info = this.ui.detailsUsers.add(new DetailsUser());
+		if (!store.observer) {
+			this.pointer.main.info = this.ui.detailsUsers.add(new DetailsUser());
+		}
 	}
 
 	static addListeners() {
@@ -106,7 +108,9 @@ export class FluidController {
 		// Update and prune
 		Object.keys(this.pointer).forEach(id => {
 			if (id === 'main') {
-				this.pointer.main.info.setData(Data.getUserData(store.id));
+				if (this.pointer.main.info) {
+					this.pointer.main.info.setData(Data.getUserData(store.id));
+				}
 				return;
 			}
 
@@ -162,11 +166,13 @@ export class FluidController {
 		this.pointer.main.isMove = true;
 		this.pointer.main.mouse.copy(event);
 
-		this.pointer.main.info.setData(Data.getUserData(store.id), {
-			isDown: this.pointer.main.isDown,
-			x: event.x / this.width,
-			y: event.y / this.height
-		});
+		if (this.pointer.main.info) {
+			this.pointer.main.info.setData(Data.getUserData(store.id), {
+				isDown: this.pointer.main.isDown,
+				x: event.x / this.width,
+				y: event.y / this.height
+			});
+		}
 
 		this.send(event);
 	};
