@@ -19,6 +19,9 @@ export class App {
 
 		this.initWorld();
 		this.initViews();
+
+		await Data.Socket.ready();
+
 		this.initControllers();
 
 		this.addListeners();
@@ -26,7 +29,6 @@ export class App {
 
 		await Promise.all([
 			document.fonts.ready,
-			Data.Socket.ready(),
 			this.loader.ready()
 		]);
 
