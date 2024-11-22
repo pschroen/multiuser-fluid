@@ -182,7 +182,7 @@ export class FluidController {
 	};
 
 	static onMotion = e => {
-		if (!this.pointer[e.id]) {
+		if (!this.enabled || !this.pointer[e.id]) {
 			return;
 		}
 
