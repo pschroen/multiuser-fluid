@@ -1,5 +1,5 @@
 import { HalfFloatType, Vector2 } from 'three';
-import { Reticle, Stage, getDoubleRenderTarget } from '@alienkitty/space.js/three';
+import { LinkedList, Reticle, Stage, getDoubleRenderTarget } from '@alienkitty/space.js/three';
 
 import { Data } from '../../data/Data.js';
 import { AudioController } from '../audio/AudioController.js';
@@ -17,7 +17,8 @@ export class FluidController {
 		this.trackers = trackers;
 		this.ui = ui;
 
-		this.pointer = {};
+		this.list = new LinkedList();
+		this.pointer = null;
 		this.lerpSpeed = 0.07;
 		this.enabled = false;
 
@@ -45,16 +46,21 @@ export class FluidController {
 			this.passMaterial.uniforms.uStrength.value[i] = new Vector2();
 		}
 
-		this.pointer.main = {};
-		this.pointer.main.isMove = false;
-		this.pointer.main.isDown = false;
-		this.pointer.main.mouse = new Vector2();
-		this.pointer.main.last = new Vector2();
-		this.pointer.main.delta = new Vector2();
+		const pointer = {};
+		pointer.id = 'main';
+		pointer.isMove = false;
+		pointer.isDown = false;
+		pointer.mouse = new Vector2();
+		pointer.last = new Vector2();
+		pointer.delta = new Vector2();
 
 		if (!store.observer) {
-			this.pointer.main.info = this.ui.detailsUsers.add(new DetailsUser());
+			pointer.info = this.ui.detailsUsers.add(new DetailsUser());
 		}
+
+		this.list.push(pointer);
+
+		this.pointer = pointer;
 	}
 
 	static addListeners() {
@@ -86,61 +92,73 @@ export class FluidController {
 				return;
 			}
 
-			if (Number(id) !== numPointers && !this.pointer[id]) {
-				this.pointer[id] = {};
-				this.pointer[id].isMove = false;
-				this.pointer[id].isDown = false;
-				this.pointer[id].mouse = new Vector2();
-				this.pointer[id].last = new Vector2();
-				this.pointer[id].delta = new Vector2();
-				this.pointer[id].target = new Vector2();
+			if (Number(id) !== numPointers && !this.list.find(pointer => pointer.id === id)) {
+				const pointer = {};
+				pointer.id = id;
+				pointer.isMove = false;
+				pointer.isDown = false;
+				pointer.mouse = new Vector2();
+				pointer.last = new Vector2();
+				pointer.delta = new Vector2();
+				pointer.target = new Vector2();
 
-				this.pointer[id].tracker = this.trackers.add(new Reticle());
-				this.pointer[id].info = this.ui.detailsUsers.add(new DetailsUser());
+				pointer.tracker = this.trackers.add(new Reticle());
+				pointer.info = this.ui.detailsUsers.add(new DetailsUser());
 
 				if (this.ui.isDetailsOpen) {
-					this.pointer[id].info.enable();
-					this.pointer[id].info.animateIn();
+					pointer.info.enable();
+					pointer.info.animateIn();
 				}
+
+				this.list.push(pointer);
 			}
 		});
 
 		// Update and prune
-		Object.keys(this.pointer).forEach(id => {
-			if (id === 'main') {
-				if (this.pointer.main.info) {
-					this.pointer.main.info.setData(Data.getUserData(store.id));
+		if (this.list.length) {
+			let pointer = this.list.start();
+
+			while (pointer) {
+				if (pointer.id === 'main') {
+					if (pointer.info) {
+						pointer.info.setData(Data.getUserData(store.id));
+					}
+
+					pointer = this.list.next();
+					continue;
 				}
-				return;
-			}
 
-			if (ids.includes(id)) {
-				this.pointer[id].tracker.setData(Data.getReticleData(id));
-				this.pointer[id].info.setData(Data.getUserData(id));
-			} else {
-				const tracker = this.pointer[id].tracker;
-				const info = this.pointer[id].info;
+				if (ids.includes(pointer.id)) {
+					pointer.tracker.setData(Data.getReticleData(pointer.id));
+					pointer.info.setData(Data.getUserData(pointer.id));
+				} else {
+					const id = pointer.id;
+					const tracker = pointer.tracker;
+					const info = pointer.info;
 
-				delete this.pointer[id];
+					this.list.remove(pointer);
 
-				tracker.animateOut(() => {
-					const i = Number(id);
+					tracker.animateOut(() => {
+						const i = Number(id);
 
-					this.passMaterial.uniforms.uMouse.value[i].set(0.5, 0.5);
-					this.passMaterial.uniforms.uLast.value[i].set(0.5, 0.5);
-					this.passMaterial.uniforms.uVelocity.value[i].set(0, 0);
-					this.passMaterial.uniforms.uStrength.value[i].set(0, 0);
+						this.passMaterial.uniforms.uMouse.value[i].set(0.5, 0.5);
+						this.passMaterial.uniforms.uLast.value[i].set(0.5, 0.5);
+						this.passMaterial.uniforms.uVelocity.value[i].set(0, 0);
+						this.passMaterial.uniforms.uStrength.value[i].set(0, 0);
 
-					AudioController.remove(id);
+						AudioController.remove(id);
 
-					tracker.destroy();
+						tracker.destroy();
 
-					info.animateOut(() => {
-						info.destroy();
+						info.animateOut(() => {
+							info.destroy();
+						});
 					});
-				});
+				}
+
+				pointer = this.list.next();
 			}
-		});
+		}
 	};
 
 	static onPointerDown = e => {
@@ -148,7 +166,7 @@ export class FluidController {
 			return;
 		}
 
-		this.pointer.main.isDown = true;
+		this.pointer.isDown = true;
 
 		this.onPointerMove(e);
 	};
@@ -163,12 +181,12 @@ export class FluidController {
 			y: clientY
 		};
 
-		this.pointer.main.isMove = true;
-		this.pointer.main.mouse.copy(event);
+		this.pointer.isMove = true;
+		this.pointer.mouse.copy(event);
 
-		if (this.pointer.main.info) {
-			this.pointer.main.info.setData(Data.getUserData(store.id), {
-				isDown: this.pointer.main.isDown,
+		if (this.pointer.info) {
+			this.pointer.info.setData(Data.getUserData(store.id), {
+				isDown: this.pointer.isDown,
 				x: event.x / this.width,
 				y: event.y / this.height
 			});
@@ -182,40 +200,44 @@ export class FluidController {
 			return;
 		}
 
-		this.pointer.main.isDown = false;
+		this.pointer.isDown = false;
 
 		this.onPointerMove(e);
 	};
 
 	static onMotion = e => {
-		if (!this.enabled || !this.pointer[e.id]) {
+		if (!this.enabled) {
 			return;
 		}
 
-		// First input
-		if (!this.pointer[e.id].isMove) {
-			this.pointer[e.id].isMove = true;
-			this.pointer[e.id].isDown = e.isDown;
-			this.pointer[e.id].target.set(e.x * this.width, e.y * this.height);
-			this.pointer[e.id].mouse.copy(this.pointer[e.id].target);
-			this.pointer[e.id].last.copy(this.pointer[e.id].mouse);
+		const pointer = this.list.find(pointer => pointer.id === e.id);
 
-			this.pointer[e.id].tracker.css({ left: this.pointer[e.id].mouse.x, top: this.pointer[e.id].mouse.y });
-			this.pointer[e.id].tracker.setData(Data.getReticleData(e.id));
-			this.pointer[e.id].tracker.animateIn();
+		if (pointer) {
+			// First input
+			if (!pointer.isMove) {
+				pointer.isMove = true;
+				pointer.isDown = e.isDown;
+				pointer.target.set(e.x * this.width, e.y * this.height);
+				pointer.mouse.copy(pointer.target);
+				pointer.last.copy(pointer.mouse);
 
-			AudioController.trigger('bass_drum');
+				pointer.tracker.css({ left: pointer.mouse.x, top: pointer.mouse.y });
+				pointer.tracker.setData(Data.getReticleData(e.id));
+				pointer.tracker.animateIn();
+
+				AudioController.trigger('bass_drum');
+			}
+
+			// Update
+			pointer.isDown = e.isDown;
+			pointer.target.set(e.x * this.width, e.y * this.height);
+
+			pointer.info.setData(Data.getUserData(e.id), {
+				isDown: e.isDown,
+				x: e.x,
+				y: e.y
+			});
 		}
-
-		// Update
-		this.pointer[e.id].isDown = e.isDown;
-		this.pointer[e.id].target.set(e.x * this.width, e.y * this.height);
-
-		this.pointer[e.id].info.setData(Data.getUserData(e.id), {
-			isDown: e.isDown,
-			x: e.x,
-			y: e.y
-		});
 	};
 
 	// Public methods
@@ -226,8 +248,8 @@ export class FluidController {
 
 		this.fluid.setSize(width * dpr, height * dpr);
 
-		this.pointer.main.mouse.set(width / 2, height / 2);
-		this.pointer.main.last.copy(this.pointer.main.mouse);
+		this.pointer.mouse.set(width / 2, height / 2);
+		this.pointer.last.copy(this.pointer.mouse);
 	};
 
 	static update = () => {
@@ -235,28 +257,34 @@ export class FluidController {
 			return;
 		}
 
-		Object.keys(this.pointer).forEach(id => {
-			if (id !== 'main') {
-				this.pointer[id].mouse.lerp(this.pointer[id].target, this.lerpSpeed);
-				this.pointer[id].tracker.css({ left: this.pointer[id].mouse.x, top: this.pointer[id].mouse.y });
+		if (this.list.length) {
+			let pointer = this.list.start();
+
+			while (pointer) {
+				if (pointer.id !== 'main') {
+					pointer.mouse.lerp(pointer.target, this.lerpSpeed);
+					pointer.tracker.css({ left: pointer.mouse.x, top: pointer.mouse.y });
+				}
+
+				if (!(store.observer && pointer.id === 'main')) {
+					pointer.delta.subVectors(pointer.mouse, pointer.last);
+					pointer.last.copy(pointer.mouse);
+
+					const distance = Math.min(10, pointer.delta.length()) / 10;
+
+					const i = pointer.id === 'main' ? Number(store.id) : Number(pointer.id);
+
+					this.passMaterial.uniforms.uLast.value[i].copy(this.passMaterial.uniforms.uMouse.value[i]);
+					this.passMaterial.uniforms.uMouse.value[i].set(pointer.mouse.x / this.width, (this.height - pointer.mouse.y) / this.height);
+					this.passMaterial.uniforms.uVelocity.value[i].copy(pointer.delta);
+					this.passMaterial.uniforms.uStrength.value[i].set((pointer.id === 'main' && !pointer.isMove) || pointer.isDown ? 50 : 50 * distance, 50 * distance);
+
+					AudioController.update(pointer.id, pointer.mouse.x, pointer.mouse.y);
+				}
+
+				pointer = this.list.next();
 			}
-
-			if (!(store.observer && id === 'main')) {
-				this.pointer[id].delta.subVectors(this.pointer[id].mouse, this.pointer[id].last);
-				this.pointer[id].last.copy(this.pointer[id].mouse);
-
-				const distance = Math.min(10, this.pointer[id].delta.length()) / 10;
-
-				const i = id === 'main' ? Number(store.id) : Number(id);
-
-				this.passMaterial.uniforms.uLast.value[i].copy(this.passMaterial.uniforms.uMouse.value[i]);
-				this.passMaterial.uniforms.uMouse.value[i].set(this.pointer[id].mouse.x / this.width, (this.height - this.pointer[id].mouse.y) / this.height);
-				this.passMaterial.uniforms.uVelocity.value[i].copy(this.pointer[id].delta);
-				this.passMaterial.uniforms.uStrength.value[i].set((id === 'main' && !this.pointer[id].isMove) || this.pointer[id].isDown ? 50 : 50 * distance, 50 * distance);
-
-				AudioController.update(id, this.pointer[id].mouse.x, this.pointer[id].mouse.y);
-			}
-		});
+		}
 
 		// Fluid pass
 		this.passMaterial.uniforms.tMap.value = this.fluid.read.texture;
@@ -274,7 +302,7 @@ export class FluidController {
 
 	static send = e => {
 		Data.Socket.motion({
-			isDown: this.pointer.main.isDown,
+			isDown: this.pointer.isDown,
 			x: e.x / this.width,
 			y: e.y / this.height
 		});
