@@ -103,6 +103,8 @@ export class FluidController {
 				pointer.target = new Vector2();
 
 				pointer.tracker = this.trackers.add(new Reticle());
+				pointer.tracker.id = id;
+
 				pointer.info = this.ui.detailsUsers.add(new DetailsUser());
 
 				if (this.ui.isDetailsOpen) {
