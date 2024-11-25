@@ -4,13 +4,13 @@ A fluid shader tribute to Mr.doob's Multiuser Sketchpad from 2010. Multiuser Flu
 
 [https://multiuser-fluid.glitch.me/](https://multiuser-fluid.glitch.me/)
 
-## 2024 updates
+#### 2024 updates
 
 Fixes and updates, additional UI elements, support for more connections, and an observer mode.
 
 [https://multiuser-fluid.glitch.me/?observer](https://multiuser-fluid.glitch.me/?observer)
 
-## Keyboard shortcuts
+#### Keyboard shortcuts
 
 **Esc**: Toggle details.  
 **Control-0**: Toggle UI.  
